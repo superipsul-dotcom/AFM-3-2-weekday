@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>스파게티 알라 까르보나라 · 정통 로마식 레시피</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    /* Tailwind으로 표현하기 어려운 요소만 별도 정의 */
+    html { scroll-behavior: smooth; }
+    @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+    .animate-fadeIn { animation: fadeIn .2s ease-out; }
+    @keyframes popIn { from { opacity: 0; transform: scale(.96) } to { opacity: 1; transform: scale(1) } }
+    .animate-popIn { animation: popIn .2s ease-out; }
+    /* 가독성을 위한 히어로 텍스트 그림자 */
+    .text-shadow { text-shadow: 0 2px 12px rgba(0,0,0,.55); }
+  </style>
+</head>
+<body class="bg-amber-50 text-stone-800 antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ========================================
+    // React Hooks
+    // ========================================
+    const { useState, useMemo } = React;
+
+    // ========================================
+    // 이미지 상수 (Wikimedia Commons)
+    // ========================================
+    const HERO_IMG = "https://upload.wikimedia.org/wikipedia/commons/9/93/Spaghetti_alla_Carbonara.jpg";
+    const GALLERY = [
+      { src: "https://upload.wikimedia.org/wikipedia/commons/3/30/Spaghetti_carbonara.jpg", alt: "완성된 스파게티 까르보나라 접시 1" },
+      { src: "https://upload.wikimedia.org/wikipedia/commons/c/c6/2015-04-23_Spaghetti_Carbonara_anagoria.JPG", alt: "완성된 스파게티 까르보나라 접시 2" },
+      { src: "https://upload.wikimedia.org/wikipedia/commons/8/83/Autentica_Carbonara.jpg", alt: "정통 까르보나라 클로즈업" },
+      { src: "https://upload.wikimedia.org/wikipedia/commons/e/e4/Amin-carbonra.jpg", alt: "까르보나라 한 접시" },
+      { src: "https://upload.wikimedia.org/wikipedia/commons/9/9e/2016-12-23_Spaghetti_Carbonara.JPG", alt: "후추를 뿌린 까르보나라" },
+    ];
+
+    // 이미지 로드 실패 시 회색 플레이스홀더 SVG로 대체
+    const PLACEHOLDER =
+      "data:image/svg+xml;charset=utf-8," +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="100%" height="100%" fill="#d6d3d1"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#78716c">이미지를 불러올 수 없습니다</text></svg>'
+      );
+    const handleImgError = (e) => {
+      if (e.target.src !== PLACEHOLDER) {
+        e.target.onerror = null;
+        e.target.src = PLACEHOLDER;
+      }
+    };
+
+    // ========================================
+    // 레시피 데이터
+    // ========================================
+    // scalable: 인분에 비례해 분량을 곱할지 여부 (후추/소금 등 비계량은 false)
+    const BASE_SERVINGS = 2;
+    const INGREDIENTS = [
+      { name: "스파게티", amount: 200, unit: "g", scalable: true },
+      { name: "관찰레 (Guanciale, 돼지 볼살 염장)", amount: 100, unit: "g", scalable: true, note: "대체: 판체타 (베이컨은 정통이 아님)" },
+      { name: "달걀 노른자", amount: 4, unit: "개", scalable: true, note: "전란 1개 추가 (노른자 위주)" },
+      { name: "전란", amount: 1, unit: "개", scalable: true },
+      { name: "페코리노 로마노 치즈 (간 것)", amount: 50, unit: "g", scalable: true },
+      { name: "통후추 (갓 갈아서)", amount: null, unit: "넉넉히", scalable: false },
+      { name: "소금 (면수용)", amount: null, unit: "적당량", scalable: false, note: "짠맛이 강하므로 평소보다 적게" },
+    ];
+
+    const STEPS = [
+      "큰 냄비에 물을 끓이고 소금을 넣어 스파게티를 알 덴테로 삶기 시작한다. (면수는 절대 버리지 말 것!)",
+      "관찰레를 1cm 두께로 썰어 기름 없이 약불~중불에 바삭하게 구워 기름을 낸다.",
+      "볼에 달걀 노른자 4개 + 전란 1개, 간 페코리노 로마노, 후추를 듬뿍 넣고 잘 섞어 되직한 크림 상태로 만든다.",
+      "면이 알 덴테로 익으면 관찰레 팬으로 옮기고, 면수 한 국자를 넣어 살짝 섞는다. (불은 끄거나 아주 약하게)",
+      "팬을 불에서 내린 뒤(중요!) 달걀·치즈 혼합물을 붓고 빠르게 섞는다. 면수를 조금씩 더해 농도를 조절 — 달걀이 익어 스크램블 되지 않도록 잔열로만.",
+      "크리미해지면 접시에 담고 페코리노와 후추를 더 뿌려 완성.",
+    ];
+
+    const TIPS = [
+      { icon: "🔥", title: "불을 끄고 잔열로", text: "달걀은 불 위에서 익히면 스크램블이 됩니다. 반드시 팬을 불에서 내린 뒤 잔열로만 유화시키세요." },
+      { icon: "💧", title: "면수의 전분이 핵심", text: "면수에 녹아든 전분이 소스를 유화시켜 크리미함을 만듭니다. 면수는 꼭 남겨두세요." },
+      { icon: "🐖", title: "정통 3요소", text: "관찰레 → 페코리노 로마노 → 후추. 이 세 가지가 정통 까르보나라를 완성합니다." },
+      { icon: "🧂", title: "소금은 적게", text: "관찰레와 페코리노 자체가 짭짤하므로 면수의 소금은 평소보다 적게 넣으세요." },
+    ];
+
+    // ========================================
+    // 🎨 Design System Components
+    // ========================================
+    const Badge = ({ children, className = "" }) => (
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold backdrop-blur-sm ${className}`}>
+        {children}
+      </span>
+    );
+
+    const Card = ({ children, className = "" }) => (
+      <div className={`rounded-2xl bg-white shadow-sm ring-1 ring-amber-100 ${className}`}>{children}</div>
+    );
+
+    const SectionTitle = ({ kicker, title }) => (
+      <div className="mb-8 text-center">
+        {kicker && (
+          <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-red-700">{kicker}</p>
+        )}
+        <h2 className="text-3xl font-extrabold text-stone-800 sm:text-4xl">{title}</h2>
+        <div className="mx-auto mt-4 h-1 w-20 rounded-full bg-gradient-to-r from-green-600 via-amber-400 to-red-600" />
+      </div>
+    );
+
+    const RoundButton = ({ children, onClick, disabled, ariaLabel }) => (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500 text-xl font-bold text-white shadow transition hover:bg-amber-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300"
+      >
+        {children}
+      </button>
+    );
+
+    // ========================================
+    // 🧩 Section Components
+    // ========================================
+
+    // 1. 히어로
+    const Hero = () => (
+      <header className="relative isolate flex min-h-[78vh] items-center justify-center overflow-hidden">
+        <img
+          src={HERO_IMG}
+          alt="갓 완성된 스파게티 알라 까르보나라"
+          onError={handleImgError}
+          className="absolute inset-0 -z-10 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/55 via-black/40 to-black/70" />
+        <div className="mx-auto max-w-3xl px-6 py-20 text-center text-white">
+          <Badge className="bg-white/15 text-amber-200 ring-1 ring-white/30">🇮🇹 정통 로마식 레시피</Badge>
+          <h1 className="mt-6 text-4xl font-extrabold leading-tight text-shadow sm:text-6xl">
+            스파게티 알라 까르보나라
+          </h1>
+          <p className="mt-3 text-lg font-medium italic text-amber-100 text-shadow sm:text-2xl">
+            Spaghetti alla Carbonara
+          </p>
+          <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-stone-100 text-shadow sm:text-lg">
+            달걀, 페코리노 로마노, 관찰레, 후추만으로 완성하는
+            진짜 로마의 맛. 크림은 한 방울도 넣지 않습니다.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Badge className="bg-white/20 text-white ring-1 ring-white/30">👥 2인분</Badge>
+            <Badge className="bg-white/20 text-white ring-1 ring-white/30">⏱️ 약 25분</Badge>
+            <Badge className="bg-white/20 text-white ring-1 ring-white/30">🔥 난이도 중</Badge>
+          </div>
+        </div>
+      </header>
+    );
+
+    // 2. "크림 NO" 콜아웃
+    const NoCreamCallout = () => (
+      <section className="px-6 py-12">
+        <div className="mx-auto max-w-4xl">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-700 to-red-800 p-8 text-white shadow-lg sm:p-10">
+            <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+              <div className="text-5xl sm:text-6xl" aria-hidden="true">🚫🥛</div>
+              <div>
+                <h2 className="text-2xl font-extrabold sm:text-3xl">정통 까르보나라 = 크림 NO</h2>
+                <p className="mt-3 leading-relaxed text-red-50">
+                  정통 로마식 까르보나라는 <strong className="text-amber-200">생크림을 절대 넣지 않습니다.</strong>{" "}
+                  달걀 노른자와 페코리노 로마노 치즈, 그리고 면수의 전분이 만들어내는 자연스러운 유화로
+                  크리미함을 냅니다.
+                </p>
+                <p className="mt-3 text-sm text-red-100">
+                  ❌ 정통 레시피에 넣지 않는 것: <span className="font-semibold">마늘 · 양파 · 생크림 · 파슬리</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+
+    // 3 + 4. 재료 섹션 (인분 조절 포함)
+    const Ingredients = () => {
+      const [servings, setServings] = useState(BASE_SERVINGS);
+      const factor = servings / BASE_SERVINGS;
+
+      const formatAmount = (ing) => {
+        if (!ing.scalable || ing.amount == null) return null;
+        const v = ing.amount * factor;
+        // 정수면 정수로, 아니면 소수 1자리
+        const num = Number.isInteger(v) ? v : Math.round(v * 10) / 10;
+        return `${num}${ing.unit}`;
+      };
+
+      return (
+        <section className="px-6 py-12" id="ingredients">
+          <div className="mx-auto max-w-4xl">
+            <SectionTitle kicker="Ingredienti" title="재료" />
+
+            {/* 인분 조절 */}
+            <Card className="mb-8 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-stone-500">인분 조절</p>
+                  <p className="text-xs text-stone-400">계량 재료는 자동 계산됩니다 (후추·소금 제외)</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <RoundButton onClick={() => setServings((s) => Math.max(1, s - 1))} disabled={servings <= 1} ariaLabel="인분 줄이기">−</RoundButton>
+                  <span className="min-w-[4.5rem] text-center text-2xl font-extrabold text-amber-600">{servings}인분</span>
+                  <RoundButton onClick={() => setServings((s) => Math.min(12, s + 1))} disabled={servings >= 12} ariaLabel="인분 늘리기">+</RoundButton>
+                </div>
+              </div>
+            </Card>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {INGREDIENTS.map((ing, i) => {
+                const amt = formatAmount(ing);
+                return (
+                  <Card key={i} className="flex flex-col gap-1 p-5 transition hover:ring-amber-300">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-semibold text-stone-800">{ing.name}</span>
+                      <span className="shrink-0 rounded-lg bg-amber-100 px-3 py-1 text-sm font-bold text-amber-800">
+                        {amt ?? ing.unit}
+                      </span>
+                    </div>
+                    {ing.note && <p className="text-sm text-stone-500">↳ {ing.note}</p>}
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      );
+    };
+
+    // 5. 조리 순서 (체크박스 + 진행률)
+    const Steps = () => {
+      const [checked, setChecked] = useState(() => STEPS.map(() => false));
+      const doneCount = checked.filter(Boolean).length;
+      const progress = Math.round((doneCount / STEPS.length) * 100);
+
+      const toggle = (i) =>
+        setChecked((prev) => prev.map((v, idx) => (idx === i ? !v : v)));
+
+      return (
+        <section className="bg-stone-50 px-6 py-12" id="steps">
+          <div className="mx-auto max-w-4xl">
+            <SectionTitle kicker="Preparazione" title="조리 순서" />
+
+            {/* 진행률 */}
+            <div className="mb-8">
+              <div className="mb-2 flex items-center justify-between text-sm font-medium text-stone-600">
+                <span>진행률</span>
+                <span>{doneCount} / {STEPS.length} 단계 완료 ({progress}%)</span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-green-600 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
+            <ol className="space-y-3">
+              {STEPS.map((step, i) => {
+                const isDone = checked[i];
+                return (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(i)}
+                      aria-pressed={isDone}
+                      className={`flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                        isDone
+                          ? "border-green-200 bg-green-50"
+                          : "border-amber-100 bg-white hover:border-amber-300 hover:bg-amber-50/50"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition ${
+                          isDone ? "bg-green-600 text-white" : "bg-amber-500 text-white"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {isDone ? "✓" : i + 1}
+                      </span>
+                      <p className={`leading-relaxed ${isDone ? "text-stone-400 line-through" : "text-stone-700"}`}>
+                        {step}
+                      </p>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </section>
+      );
+    };
+
+    // 6. 핵심 팁
+    const Tips = () => (
+      <section className="px-6 py-12" id="tips">
+        <div className="mx-auto max-w-4xl">
+          <SectionTitle kicker="Consigli" title="핵심 팁" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {TIPS.map((tip, i) => (
+              <Card key={i} className="flex gap-4 p-5">
+                <div className="text-3xl" aria-hidden="true">{tip.icon}</div>
+                <div>
+                  <h3 className="font-bold text-stone-800">{tip.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-stone-600">{tip.text}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+
+    // 7. 갤러리 + 모달
+    const Gallery = () => {
+      const [active, setActive] = useState(null); // 선택된 이미지 객체
+
+      return (
+        <section className="bg-stone-50 px-6 py-12" id="gallery">
+          <div className="mx-auto max-w-5xl">
+            <SectionTitle kicker="Galleria" title="완성 사진" />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-4">
+              {GALLERY.map((img, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setActive(img)}
+                  className="group relative aspect-square overflow-hidden rounded-2xl shadow-sm ring-1 ring-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                  aria-label={`${img.alt} 크게 보기`}
+                >
+                  <img
+                    src={img.src}
+                    alt={img.alt}
+                    loading="lazy"
+                    onError={handleImgError}
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
+                    🔍
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {active && (
+            <div
+              className="fixed inset-0 z-50 flex animate-fadeIn items-center justify-center bg-black/80 p-4"
+              onClick={() => setActive(null)}
+              role="dialog"
+              aria-modal="true"
+              aria-label={active.alt}
+            >
+              <div className="relative animate-popIn" onClick={(e) => e.stopPropagation()}>
+                <img
+                  src={active.src}
+                  alt={active.alt}
+                  onError={handleImgError}
+                  className="max-h-[85vh] max-w-full rounded-2xl shadow-2xl"
+                />
+                <p className="mt-3 text-center text-sm text-stone-200">{active.alt}</p>
+                <button
+                  type="button"
+                  onClick={() => setActive(null)}
+                  aria-label="닫기"
+                  className="absolute -right-3 -top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl font-bold text-stone-700 shadow-lg transition hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      );
+    };
+
+    // 8. 푸터 / 크레딧
+    const Footer = () => (
+      <footer className="border-t border-amber-100 bg-amber-50 px-6 py-8 text-center">
+        <p className="text-sm font-medium text-stone-600">
+          🇮🇹 Buon appetito! 정통 로마의 맛을 즐기세요.
+        </p>
+        <p className="mt-2 text-xs text-stone-400">이미지 출처: Wikimedia Commons</p>
+      </footer>
+    );
+
+    // ========================================
+    // 🚀 App
+    // ========================================
+    const App = () => (
+      <main>
+        <Hero />
+        <NoCreamCallout />
+        <Ingredients />
+        <Steps />
+        <Tips />
+        <Gallery />
+        <Footer />
+      </main>
+    );
+
+    // ========================================
+    // Rendering
+    // ========================================
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

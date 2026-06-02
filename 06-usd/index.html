@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>환율 계산기 · USD → KRW</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    /* 숫자 입력 스피너 제거 (애플 느낌의 깔끔한 입력) */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] { -moz-appearance: textfield; }
+    /* 방향 전환 시 부드러운 페이드 */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.35s ease; }
+  </style>
+</head>
+<body class="bg-[#f5f5f7] text-[#1d1d1f]">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ========================================
+    // React Hooks Destructuring
+    // ========================================
+    const { useState, useMemo, useCallback } = React;
+
+    // ========================================
+    // 환율 상수 (하드코딩, API 호출 없음)
+    // ========================================
+    const USD_TO_KRW = 1500; // 1 USD = 1,500 KRW
+
+    // ========================================
+    // 유틸 함수 — 포맷팅 / 검증
+    // ========================================
+    // 달러 표시: 천단위 콤마 + 소수점 둘째자리까지 (필요할 때만)
+    function formatUSD(value) {
+      const num = Number(value);
+      return num.toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    // 원화 표시: 정수로 반올림 + 천단위 콤마
+    function formatKRW(value) {
+      const num = Math.round(Number(value));
+      return num.toLocaleString("ko-KR");
+    }
+
+    // 입력값 검증: 빈 값 / 비숫자 / 음수 처리
+    // 반환: { ok, value, message }
+    function validateAmount(raw) {
+      const trimmed = String(raw).trim();
+      if (trimmed === "") {
+        return { ok: false, empty: true, value: 0, message: "" };
+      }
+      const num = Number(trimmed);
+      if (Number.isNaN(num)) {
+        return { ok: false, empty: false, value: 0, message: "숫자만 입력해 주세요." };
+      }
+      if (num < 0) {
+        return { ok: false, empty: false, value: 0, message: "0 이상의 금액을 입력해 주세요." };
+      }
+      return { ok: true, empty: false, value: num, message: "" };
+    }
+
+    // ========================================
+    // 🎨 Design System Components
+    // ========================================
+
+    // 기본 버튼 — variant / size 지원
+    function Button({ variant = "primary", size = "md", className = "", children, ...props }) {
+      const base =
+        "inline-flex items-center justify-center font-medium rounded-full transition-all duration-200 active:scale-95 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed";
+      const variants = {
+        primary: "bg-[#0071e3] text-white hover:bg-[#0077ed] shadow-sm",
+        secondary: "bg-[#e8e8ed] text-[#1d1d1f] hover:bg-[#dcdce1]",
+        ghost: "bg-transparent text-[#0071e3] hover:bg-[#0071e3]/10",
+      };
+      const sizes = {
+        sm: "text-sm px-3 py-1.5",
+        md: "text-base px-5 py-2.5",
+        lg: "text-lg px-7 py-3.5",
+      };
+      return (
+        <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
+          {children}
+        </button>
+      );
+    }
+
+    // 통화 입력 필드 — 라벨 / 통화기호 / 에러 표시
+    function CurrencyInput({ label, symbol, value, onChange, placeholder, error, autoFocus }) {
+      return (
+        <div className="w-full">
+          <label className="block text-xs font-medium text-[#86868b] mb-2 ml-1 tracking-wide uppercase">
+            {label}
+          </label>
+          <div
+            className={`flex items-center bg-[#f5f5f7] rounded-2xl px-4 transition-all duration-200 border ${
+              error ? "border-[#ff3b30]" : "border-transparent focus-within:border-[#0071e3]"
+            }`}
+          >
+            <span className="text-2xl font-light text-[#86868b] mr-2 select-none">{symbol}</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              autoFocus={autoFocus}
+              aria-label={label}
+              className="w-full bg-transparent py-4 text-3xl font-light text-[#1d1d1f] placeholder-[#c7c7cc] outline-none"
+            />
+          </div>
+          {error ? (
+            <p className="mt-2 ml-1 text-sm text-[#ff3b30]" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      );
+    }
+
+    // ========================================
+    // 📄 Page Component — 환율 계산기
+    // ========================================
+    function ConverterApp() {
+      // 입력값(문자열)과 방향("USD" → 입력이 달러, "KRW" → 입력이 원화)
+      const [amount, setAmount] = useState("");
+      const [direction, setDirection] = useState("USD");
+
+      const validation = useMemo(() => validateAmount(amount), [amount]);
+
+      // 결과 계산
+      const result = useMemo(() => {
+        if (!validation.ok) return null;
+        if (direction === "USD") {
+          return validation.value * USD_TO_KRW; // KRW
+        }
+        return validation.value / USD_TO_KRW; // USD
+      }, [validation, direction]);
+
+      // 입력/출력 통화 메타데이터
+      const meta =
+        direction === "USD"
+          ? {
+              inLabel: "달러 (USD)",
+              inSymbol: "$",
+              outLabel: "원화 (KRW)",
+              outSymbol: "₩",
+              outFormat: formatKRW,
+            }
+          : {
+              inLabel: "원화 (KRW)",
+              inSymbol: "₩",
+              outLabel: "달러 (USD)",
+              outSymbol: "$",
+              outFormat: formatUSD,
+            };
+
+      const handleSwap = useCallback(() => {
+        // 방향 전환 시 현재 결과값을 새 입력으로 이어받아 자연스럽게 연결
+        setDirection((prev) => (prev === "USD" ? "KRW" : "USD"));
+        if (result !== null) {
+          const carried =
+            direction === "USD" ? Math.round(result) : Number(result.toFixed(2));
+          setAmount(String(carried));
+        }
+      }, [result, direction]);
+
+      const handleClear = useCallback(() => setAmount(""), []);
+
+      // 빠른 금액 버튼 (USD 방향일 때만 노출)
+      const quickAmounts = [1, 10, 100, 1000];
+
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10">
+          <div className="w-full max-w-md">
+            {/* 헤더 */}
+            <header className="text-center mb-8">
+              <h1 className="text-3xl font-semibold tracking-tight">환율 계산기</h1>
+              <p className="mt-2 text-[#86868b]">
+                기준 환율 · <span className="font-medium text-[#1d1d1f]">1,500원 / 달러</span>
+              </p>
+            </header>
+
+            {/* 카드 */}
+            <main className="bg-white rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.06)] p-6 sm:p-8">
+              {/* 입력 필드 */}
+              <CurrencyInput
+                label={meta.inLabel}
+                symbol={meta.inSymbol}
+                value={amount}
+                onChange={setAmount}
+                placeholder="0"
+                error={validation.message}
+                autoFocus
+              />
+
+              {/* 스왑 버튼 */}
+              <div className="flex justify-center my-5">
+                <button
+                  onClick={handleSwap}
+                  aria-label="달러와 원화 방향 전환"
+                  className="w-11 h-11 rounded-full bg-[#0071e3] text-white flex items-center justify-center shadow-md hover:bg-[#0077ed] active:scale-90 transition-all duration-200"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7 16V4M7 4L3 8M7 4l4 4" />
+                    <path d="M17 8v12M17 20l4-4M17 20l-4-4" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* 결과 디스플레이 */}
+              <div className="text-center">
+                <p className="text-xs font-medium text-[#86868b] mb-2 tracking-wide uppercase">
+                  {meta.outLabel}
+                </p>
+                {validation.empty ? (
+                  <p className="text-4xl sm:text-5xl font-extralight text-[#c7c7cc] py-2">
+                    {meta.outSymbol}0
+                  </p>
+                ) : result !== null ? (
+                  <p
+                    key={`${direction}-${amount}`}
+                    className="fade-up text-4xl sm:text-5xl font-extralight text-[#1d1d1f] py-2 break-all"
+                  >
+                    <span className="text-[#86868b]">{meta.outSymbol}</span>
+                    {meta.outFormat(result)}
+                  </p>
+                ) : (
+                  <p className="text-2xl font-light text-[#ff3b30] py-4">— —</p>
+                )}
+              </div>
+            </main>
+
+            {/* 빠른 금액 버튼 */}
+            {direction === "USD" && (
+              <div className="mt-6 grid grid-cols-4 gap-2">
+                {quickAmounts.map((amt) => (
+                  <Button
+                    key={amt}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setAmount(String(amt))}
+                    className="!rounded-2xl py-3"
+                  >
+                    ${amt}
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {/* 초기화 버튼 */}
+            <div className="mt-4 flex justify-center">
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={handleClear}
+                disabled={amount === ""}
+              >
+                초기화
+              </Button>
+            </div>
+
+            {/* 환율 안내 푸터 */}
+            <footer className="mt-8 text-center text-xs text-[#a1a1a6] leading-relaxed">
+              <p>
+                {direction === "USD"
+                  ? "$1 = ₩" + formatKRW(USD_TO_KRW)
+                  : "₩" + formatKRW(USD_TO_KRW) + " = $1"}
+              </p>
+              <p className="mt-1">고정 환율 기준의 참고용 계산 결과입니다.</p>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================================
+    // 🚀 App Component
+    // ========================================
+    function App() {
+      return <ConverterApp />;
+    }
+
+    // ========================================
+    // Rendering
+    // ========================================
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍚 돼지고기 옥수수 솥밥 레시피</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up { animation: fadeInUp 0.5s ease-out both; }
+    body { -webkit-font-smoothing: antialiased; }
+  </style>
+</head>
+<body class="bg-amber-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ========================================
+    // React Hooks Destructuring
+    // ========================================
+    const { useState, useMemo } = React;
+
+    // ========================================
+    // 🎨 Design System Components
+    // ========================================
+
+    function Badge({ children, className = "" }) {
+      return (
+        <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-semibold ${className}`}>
+          {children}
+        </span>
+      );
+    }
+
+    function Card({ children, className = "" }) {
+      return (
+        <div className={`rounded-2xl bg-white shadow-md shadow-amber-100/60 ring-1 ring-amber-100 ${className}`}>
+          {children}
+        </div>
+      );
+    }
+
+    function SectionTitle({ icon, title, subtitle }) {
+      return (
+        <div className="mb-5">
+          <h2 className="flex items-center gap-2 text-2xl font-bold text-amber-900 sm:text-3xl">
+            <span aria-hidden="true">{icon}</span>
+            {title}
+          </h2>
+          {subtitle && <p className="mt-1 text-sm text-amber-700/80">{subtitle}</p>}
+        </div>
+      );
+    }
+
+    function IconButton({ onClick, disabled, ariaLabel, children }) {
+      return (
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          aria-label={ariaLabel}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl font-bold text-amber-700 shadow ring-1 ring-amber-200 transition hover:bg-amber-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {children}
+        </button>
+      );
+    }
+
+    // ========================================
+    // 📦 Recipe Data (from 돼지고기-옥수수-솥밥.md)
+    // ========================================
+
+    const BASE_SERVINGS = 2;
+
+    // qty: 2인분 기준 수치 / unit: 단위 / note: 부가 설명 / scalable: 비례 조절 여부
+    const INGREDIENT_GROUPS = [
+      {
+        id: "rice",
+        title: "밥 재료",
+        icon: "🍚",
+        accent: "amber",
+        items: [
+          { name: "쌀 (불린 쌀 기준)", qty: 2, unit: "컵", scalable: true },
+          { name: "물", qty: 1.75, unit: "컵", note: "솥밥은 평소보다 약간 적게", scalable: true },
+          { name: "옥수수 알갱이", qty: 1, unit: "컵", note: "생옥수수·통조림·냉동 모두 가능", scalable: true },
+          { name: "돼지고기 (앞다리살 또는 목살)", qty: 200, unit: "g", scalable: true },
+          { name: "당근 (다지기)", qty: 0.25, unit: "개", scalable: true },
+          { name: "표고버섯 (채썰기)", qty: 2, unit: "개", note: "선택", scalable: true },
+        ],
+      },
+      {
+        id: "marinade",
+        title: "돼지고기 밑간",
+        icon: "🥩",
+        accent: "rose",
+        items: [
+          { name: "간장", qty: 1, unit: "큰술", scalable: true },
+          { name: "맛술(청주)", qty: 1, unit: "큰술", scalable: true },
+          { name: "다진 마늘", qty: 0.5, unit: "큰술", scalable: true },
+          { name: "후추", qty: null, unit: "", note: "약간", scalable: false },
+          { name: "참기름", qty: 0.5, unit: "큰술", scalable: true },
+        ],
+      },
+      {
+        id: "sauce",
+        title: "양념장",
+        icon: "🥄",
+        accent: "orange",
+        items: [
+          { name: "간장", qty: 3, unit: "큰술", scalable: true },
+          { name: "물", qty: 1, unit: "큰술", scalable: true },
+          { name: "다진 파", qty: 2, unit: "큰술", scalable: true },
+          { name: "고춧가루", qty: 0.5, unit: "큰술", scalable: true },
+          { name: "깨소금", qty: 0.5, unit: "큰술", scalable: true },
+          { name: "참기름", qty: 1, unit: "큰술", scalable: true },
+          { name: "다진 마늘", qty: 0.5, unit: "큰술", scalable: true },
+        ],
+      },
+    ];
+
+    const STEPS = [
+      { title: "쌀 불리기", desc: "쌀을 깨끗이 씻어 30분 정도 물에 불린 후 체에 받쳐 물기를 뺍니다." },
+      { title: "돼지고기 밑간", desc: "한입 크기로 썬 돼지고기에 밑간 재료를 넣고 10분간 재웁니다." },
+      { title: "재료 손질", desc: "옥수수는 물기를 빼고, 당근과 표고버섯은 잘게 썰어 준비합니다." },
+      { title: "고기 볶기", desc: "달군 솥(또는 냄비)에 참기름을 두르고 밑간한 돼지고기를 겉면이 익을 정도로 볶습니다." },
+      { title: "쌀 안치기", desc: "볶은 고기 위에 불린 쌀을 평평하게 올리고, 물 1¾컵을 부은 뒤 옥수수·당근·표고버섯을 골고루 얹습니다." },
+      { title: "밥 짓기", desc: "센 불로 끓이다가 끓어오르면 약불로 줄여 12~13분, 불을 끄고 10분간 뜸을 들입니다." },
+      { title: "양념장 만들기", desc: "뜸 들이는 동안 양념장 재료를 모두 섞어 둡니다." },
+      { title: "마무리", desc: "밥을 골고루 섞은 후 그릇에 담고, 기호에 따라 양념장을 곁들여 비벼 드세요." },
+    ];
+
+    const TIPS = [
+      { icon: "🌽", label: "옥수수", desc: "생옥수수를 쓰면 단맛이 가장 좋습니다. 통조림은 물기를 충분히 빼주세요." },
+      { icon: "🔥", label: "누룽지", desc: "뜸을 들인 뒤 1~2분 더 센 불로 가열하면 바닥에 고소한 누룽지가 생깁니다." },
+      { icon: "🥩", label: "돼지고기", desc: "기름이 적당히 있는 목살·앞다리살이 부드럽고 풍미가 좋습니다." },
+      { icon: "🧈", label: "고소함 강화", desc: "밥이 다 되면 버터 한 조각을 올려 섞으면 풍미가 깊어집니다." },
+      { icon: "⏱", label: "솥밥 물 양", desc: "일반 밥보다 물을 약 10% 적게 잡아야 질지 않고 고슬고슬합니다." },
+    ];
+
+    const PAIRINGS = [
+      { icon: "🍲", name: "시원한 미역국 또는 콩나물국" },
+      { icon: "🥬", name: "깍두기, 열무김치 등 새콤한 김치" },
+      { icon: "🍳", name: "달걀프라이 (반숙)" },
+    ];
+
+    const ACCENT_STYLES = {
+      amber: "bg-amber-100 text-amber-800",
+      rose: "bg-rose-100 text-rose-800",
+      orange: "bg-orange-100 text-orange-800",
+    };
+
+    // ========================================
+    // 🔧 Helpers
+    // ========================================
+
+    // 분수까지 보기 좋게 표시 (예: 1.75 -> "1¾", 0.5 -> "½")
+    function formatQty(value) {
+      const rounded = Math.round(value * 100) / 100;
+      const whole = Math.floor(rounded);
+      const frac = rounded - whole;
+      const fractionMap = [
+        { v: 0.25, s: "¼" },
+        { v: 0.33, s: "⅓" },
+        { v: 0.5, s: "½" },
+        { v: 0.67, s: "⅔" },
+        { v: 0.75, s: "¾" },
+      ];
+      const match = fractionMap.find((f) => Math.abs(frac - f.v) < 0.04);
+      if (match) {
+        return whole > 0 ? `${whole}${match.s}` : match.s;
+      }
+      // 분수 매칭 안되면 소수 1자리까지 (정수면 정수로)
+      if (Math.abs(rounded - Math.round(rounded)) < 0.001) return String(Math.round(rounded));
+      return String(Math.round(rounded * 10) / 10);
+    }
+
+    // ========================================
+    // 🧩 Layout / Section Components
+    // ========================================
+
+    function Hero() {
+      const meta = [
+        { icon: "🍴", label: "분류", value: "한식 · 밥 요리" },
+        { icon: "👥", label: "인분", value: "2인분" },
+        { icon: "⏱", label: "조리 시간", value: "약 40분" },
+        { icon: "📊", label: "난이도", value: "★★☆☆☆ 보통" },
+      ];
+      return (
+        <header className="relative overflow-hidden bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-white">
+          <div className="absolute inset-0 opacity-20" aria-hidden="true"
+            style={{ backgroundImage: "radial-gradient(circle at 20% 20%, white 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
+          <div className="relative mx-auto max-w-3xl px-5 py-12 text-center sm:py-16">
+            <div className="mb-3 text-6xl sm:text-7xl animate-fade-in-up">🍚</div>
+            <h1 className="text-3xl font-extrabold tracking-tight drop-shadow-sm sm:text-4xl animate-fade-in-up">
+              돼지고기 옥수수 솥밥
+            </h1>
+            <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-amber-50 sm:text-base animate-fade-in-up">
+              고소한 옥수수와 부드러운 돼지고기가 어우러진 한 그릇 솥밥.
+              쫀득한 누룽지와 짭조름한 양념장으로 마무리하면 별다른 반찬 없이도 완성되는 든든한 한 끼입니다.
+            </p>
+            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {meta.map((m) => (
+                <div key={m.label} className="rounded-xl bg-white/15 px-3 py-3 backdrop-blur-sm ring-1 ring-white/25">
+                  <div className="text-xl" aria-hidden="true">{m.icon}</div>
+                  <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-amber-100">{m.label}</div>
+                  <div className="text-sm font-bold">{m.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    function ServingControl({ servings, setServings }) {
+      const dec = () => setServings((s) => Math.max(1, s - 1));
+      const inc = () => setServings((s) => Math.min(12, s + 1));
+      return (
+        <Card className="flex flex-col items-center justify-between gap-4 p-5 sm:flex-row">
+          <div>
+            <h3 className="text-lg font-bold text-amber-900">인분 조절</h3>
+            <p className="text-sm text-amber-700/80">인분을 조절하면 아래 재료 분량이 자동으로 계산됩니다.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <IconButton onClick={dec} disabled={servings <= 1} ariaLabel="인분 줄이기">−</IconButton>
+            <div className="min-w-[80px] text-center">
+              <div className="text-3xl font-extrabold text-orange-600">{servings}</div>
+              <div className="text-xs font-medium text-amber-700">인분</div>
+            </div>
+            <IconButton onClick={inc} disabled={servings >= 12} ariaLabel="인분 늘리기">+</IconButton>
+          </div>
+        </Card>
+      );
+    }
+
+    function IngredientItem({ item, ratio }) {
+      let display;
+      if (item.qty == null) {
+        display = item.note || "약간";
+      } else {
+        const scaled = item.scalable ? item.qty * ratio : item.qty;
+        display = `${formatQty(scaled)}${item.unit}`;
+      }
+      return (
+        <li className="flex items-start justify-between gap-3 border-b border-amber-100 py-2.5 last:border-0">
+          <div className="flex items-start gap-2">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" aria-hidden="true" />
+            <div>
+              <span className="text-sm font-medium text-amber-950 sm:text-base">{item.name}</span>
+              {item.note && item.qty != null && (
+                <span className="ml-1 block text-xs text-amber-600/80 sm:inline sm:ml-2">({item.note})</span>
+              )}
+            </div>
+          </div>
+          <span className="shrink-0 whitespace-nowrap rounded-lg bg-amber-50 px-2.5 py-1 text-sm font-bold text-orange-700">
+            {display}
+          </span>
+        </li>
+      );
+    }
+
+    function Ingredients({ servings }) {
+      const ratio = servings / BASE_SERVINGS;
+      return (
+        <section>
+          <SectionTitle icon="🛒" title="재료" subtitle={`현재 ${servings}인분 기준 (기본 ${BASE_SERVINGS}인분에서 비례 계산)`} />
+          <div className="grid gap-4 lg:grid-cols-3">
+            {INGREDIENT_GROUPS.map((group) => (
+              <Card key={group.id} className="overflow-hidden">
+                <div className="flex items-center gap-2 border-b border-amber-100 px-5 py-3">
+                  <span className="text-xl" aria-hidden="true">{group.icon}</span>
+                  <h3 className="text-base font-bold text-amber-900">{group.title}</h3>
+                  <Badge className={`ml-auto ${ACCENT_STYLES[group.accent]}`}>{group.items.length}가지</Badge>
+                </div>
+                <ul className="px-5 py-2">
+                  {group.items.map((item, i) => (
+                    <IngredientItem key={i} item={item} ratio={ratio} />
+                  ))}
+                </ul>
+              </Card>
+            ))}
+          </div>
+        </section>
+      );
+    }
+
+    function Steps() {
+      const [done, setDone] = useState(() => STEPS.map(() => false));
+      const completedCount = useMemo(() => done.filter(Boolean).length, [done]);
+      const progress = Math.round((completedCount / STEPS.length) * 100);
+
+      const toggle = (idx) =>
+        setDone((prev) => prev.map((v, i) => (i === idx ? !v : v)));
+      const reset = () => setDone(STEPS.map(() => false));
+
+      return (
+        <section>
+          <SectionTitle icon="👩‍🍳" title="조리 순서" subtitle="각 단계를 완료하면 체크해 진행 상황을 확인하세요." />
+
+          <Card className="mb-5 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-amber-900">
+                진행률 {completedCount}/{STEPS.length}
+              </span>
+              <button
+                type="button"
+                onClick={reset}
+                disabled={completedCount === 0}
+                className="rounded-lg px-3 py-1 text-sm font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-40"
+              >
+                초기화
+              </button>
+            </div>
+            <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-amber-100" role="progressbar"
+              aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
+              <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
+                style={{ width: `${progress}%` }} />
+            </div>
+            {progress === 100 && (
+              <p className="mt-3 text-center text-sm font-semibold text-orange-600">
+                🎉 모든 단계 완료! 맛있게 드세요.
+              </p>
+            )}
+          </Card>
+
+          <ol className="space-y-3">
+            {STEPS.map((step, idx) => {
+              const isDone = done[idx];
+              return (
+                <li key={idx}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(idx)}
+                    aria-pressed={isDone}
+                    className={`flex w-full items-start gap-4 rounded-2xl p-4 text-left shadow-sm ring-1 transition
+                      ${isDone
+                        ? "bg-amber-100/70 ring-amber-200"
+                        : "bg-white ring-amber-100 hover:ring-orange-300 hover:shadow-md"}`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition
+                        ${isDone ? "bg-orange-500 text-white" : "bg-amber-100 text-amber-700"}`}
+                      aria-hidden="true"
+                    >
+                      {isDone ? "✓" : idx + 1}
+                    </span>
+                    <div className="flex-1">
+                      <h3 className={`font-bold transition ${isDone ? "text-amber-700 line-through decoration-amber-400" : "text-amber-900"}`}>
+                        {step.title}
+                      </h3>
+                      <p className={`mt-1 text-sm leading-relaxed transition ${isDone ? "text-amber-600/70 line-through decoration-amber-300" : "text-amber-800/90"}`}>
+                        {step.desc}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      );
+    }
+
+    function Tips() {
+      return (
+        <section>
+          <SectionTitle icon="💡" title="요리 팁" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {TIPS.map((tip, i) => (
+              <Card key={i} className="flex items-start gap-3 p-4">
+                <span className="text-2xl" aria-hidden="true">{tip.icon}</span>
+                <div>
+                  <h3 className="font-bold text-amber-900">{tip.label}</h3>
+                  <p className="mt-0.5 text-sm leading-relaxed text-amber-800/90">{tip.desc}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+      );
+    }
+
+    function Pairings() {
+      return (
+        <section>
+          <SectionTitle icon="🍽" title="곁들이면 좋은 음식" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            {PAIRINGS.map((p, i) => (
+              <Card key={i} className="flex items-center gap-3 p-4">
+                <span className="text-2xl" aria-hidden="true">{p.icon}</span>
+                <span className="text-sm font-medium text-amber-900">{p.name}</span>
+              </Card>
+            ))}
+          </div>
+        </section>
+      );
+    }
+
+    function Footer() {
+      return (
+        <footer className="border-t border-amber-200 bg-amber-100/60 px-5 py-6 text-center">
+          <p className="mx-auto max-w-2xl text-sm text-amber-800/90">
+            📌 재료 분량은 기본 2인분 기준이며, 위 인분 조절 기능으로 쌀·물·재료가 비례해서 자동 계산됩니다.
+          </p>
+        </footer>
+      );
+    }
+
+    // ========================================
+    // 🚀 App Component
+    // ========================================
+
+    function App() {
+      const [servings, setServings] = useState(BASE_SERVINGS);
+      return (
+        <div className="min-h-screen">
+          <Hero />
+          <main className="mx-auto max-w-4xl space-y-12 px-5 py-10 sm:py-12">
+            <ServingControl servings={servings} setServings={setServings} />
+            <Ingredients servings={servings} />
+            <Steps />
+            <Tips />
+            <Pairings />
+          </main>
+          <Footer />
+        </div>
+      );
+    }
+
+    // ========================================
+    // Rendering
+    // ========================================
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

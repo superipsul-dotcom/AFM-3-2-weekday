@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# 압축 파일
+*.zip
+
+# 의존성 / 빌드 산출물
+node_modules/
+dist/
+build/
+.cache/
+
+# 로그
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 환경 변수
+.env
+.env.local
+
+# 에디터 / IDE
+.vscode/
+.idea/
+*.swp

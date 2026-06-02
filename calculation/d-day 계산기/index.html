@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>D-day 계산기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    /* Tailwind 으로 표현하기 어려운 그라데이션 배경 애니메이션만 별도 정의 */
+    @keyframes pulseSoft {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+    .animate-pulse-soft { animation: pulseSoft 2s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // React 훅 구조분해 할당
+    const { useState, useEffect, useMemo } = React;
+
+    // ========================================
+    // 🎨 디자인 시스템 컴포넌트 (순수 프레젠테이션)
+    // ========================================
+
+    // 기본 버튼 컴포넌트
+    function Button({ variant = "primary", size = "md", className = "", children, ...props }) {
+      const base = "inline-flex items-center justify-center font-semibold rounded-xl transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed";
+      const variants = {
+        primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-200",
+        secondary: "bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50",
+        ghost: "bg-transparent text-gray-500 hover:bg-gray-100",
+      };
+      const sizes = {
+        sm: "px-3 py-1.5 text-sm",
+        md: "px-4 py-2 text-base",
+        lg: "px-6 py-3 text-lg",
+      };
+      return (
+        <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
+          {children}
+        </button>
+      );
+    }
+
+    // 라벨이 달린 입력 컴포넌트
+    function Input({ label, error, className = "", ...props }) {
+      return (
+        <div className={`w-full ${className}`}>
+          {label && <label className="block mb-1.5 text-sm font-medium text-gray-600">{label}</label>}
+          <input
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
+            {...props}
+          />
+          {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
+        </div>
+      );
+    }
+
+    // 카드 래퍼 컴포넌트
+    function Card({ className = "", children }) {
+      return (
+        <div className={`bg-white rounded-3xl shadow-xl shadow-indigo-100/60 ${className}`}>
+          {children}
+        </div>
+      );
+    }
+
+    // 카운트다운 한 칸(일/시/분/초)을 표시하는 컴포넌트
+    function CountBox({ value, label }) {
+      // 두 자리로 0 채워서 표시 (예: 7 -> "07")
+      const padded = String(value).padStart(2, "0");
+      return (
+        <div className="flex flex-col items-center bg-indigo-50 rounded-2xl py-3 px-2 sm:px-4 min-w-[64px]">
+          <span className="text-2xl sm:text-3xl font-bold text-indigo-700 tabular-nums">{padded}</span>
+          <span className="mt-1 text-xs text-indigo-400 font-medium">{label}</span>
+        </div>
+      );
+    }
+
+    // ========================================
+    // 🛠️ 날짜 계산 유틸 함수 (Date 객체 활용)
+    // ========================================
+
+    // 하루의 밀리초 수 (24시간 * 60분 * 60초 * 1000ms)
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+    // "YYYY-MM-DD" 문자열을 받아 그 날의 "자정(00:00:00)" Date 객체를 만든다.
+    // 시간대(timezone) 영향을 줄이기 위해 문자열을 직접 파싱하지 않고
+    // 연/월/일 숫자를 분해해 new Date(년, 월, 일) 로 생성한다.
+    // (주의: JavaScript 의 month 는 0부터 시작하므로 month - 1)
+    function toMidnight(dateStr) {
+      const [year, month, day] = dateStr.split("-").map(Number);
+      return new Date(year, month - 1, day, 0, 0, 0, 0);
+    }
+
+    // 오늘 날짜의 자정 Date 객체를 만든다.
+    function todayMidnight() {
+      const now = new Date(); // 현재 시각
+      // 현재의 연/월/일만 뽑아서 자정으로 다시 생성
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    }
+
+    // 목표일 자정과 오늘 자정의 차이를 "일(day)" 단위 정수로 계산한다.
+    // getTime() 은 1970-01-01 부터 흐른 밀리초를 반환한다.
+    // (목표일 밀리초 - 오늘 밀리초) / 하루 밀리초 = 남은 일수
+    function diffInDays(targetStr) {
+      const target = toMidnight(targetStr);
+      const today = todayMidnight();
+      const diffMs = target.getTime() - today.getTime();
+      // Math.round 로 자정 기준 정수 일수를 얻는다 (서머타임 등 오차 보정)
+      return Math.round(diffMs / MS_PER_DAY);
+    }
+
+    // ========================================
+    // 📄 메인 페이지 컴포넌트 (상태 + 비즈니스 로직)
+    // ========================================
+
+    function DdayCalculator() {
+      // 사용자가 입력한 이벤트 이름
+      const [title, setTitle] = useState("");
+      // 사용자가 입력한 목표 날짜 (YYYY-MM-DD 형식)
+      const [targetDate, setTargetDate] = useState("");
+      // 미입력 등 검증 에러 메시지
+      const [error, setError] = useState("");
+      // 현재 시각 — 실시간 업데이트를 위해 매초 갱신되는 상태
+      const [now, setNow] = useState(new Date());
+
+      // ----------------------------------------
+      // ⏱️ 실시간 업데이트: useEffect + setInterval
+      // ----------------------------------------
+      useEffect(() => {
+        // 1초(1000ms)마다 현재 시각 상태를 갱신한다.
+        // setNow 가 호출될 때마다 컴포넌트가 리렌더되어 카운트다운이 흐른다.
+        const timerId = setInterval(() => {
+          setNow(new Date());
+        }, 1000);
+
+        // ✅ cleanup 함수: 컴포넌트가 언마운트되거나
+        //    effect 가 다시 실행되기 직전에 호출된다.
+        //    여기서 clearInterval 로 타이머를 정리하지 않으면
+        //    인터벌이 계속 쌓여 메모리 누수와 중복 갱신이 발생한다.
+        return () => {
+          clearInterval(timerId);
+        };
+      }, []); // 의존성 배열이 빈 배열 → 마운트 시 한 번만 인터벌 등록
+
+      // D-day 일수 계산 (목표 날짜가 있을 때만)
+      // useMemo: now 가 매초 바뀌어도 날짜(targetDate)가 같으면 같은 값을 유지.
+      const dayDiff = useMemo(() => {
+        if (!targetDate) return null;
+        return diffInDays(targetDate);
+      }, [targetDate]);
+
+      // D-day 표시 문자열 만들기 (D-OO / D-DAY / D+OO)
+      const ddayLabel = useMemo(() => {
+        if (dayDiff === null) return null;
+        if (dayDiff > 0) return `D-${dayDiff}`;   // 미래
+        if (dayDiff === 0) return "D-DAY";          // 오늘
+        return `D+${Math.abs(dayDiff)}`;            // 지나감
+      }, [dayDiff]);
+
+      // ----------------------------------------
+      // 실시간 카운트다운 계산: 목표일 자정까지 남은 시간
+      // now 가 매초 갱신되므로 이 값도 매초 다시 계산된다.
+      // ----------------------------------------
+      const countdown = useMemo(() => {
+        if (!targetDate) return null;
+        const target = toMidnight(targetDate);
+        // 목표 자정 - 현재 시각 (밀리초)
+        let diff = target.getTime() - now.getTime();
+        const isPast = diff < 0;
+        diff = Math.abs(diff); // 지나간 경우에도 "경과 시간" 으로 표시
+
+        // 밀리초를 일/시/분/초로 분해
+        const days = Math.floor(diff / MS_PER_DAY);
+        const hours = Math.floor((diff % MS_PER_DAY) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        return { days, hours, minutes, seconds, isPast };
+      }, [targetDate, now]);
+
+      // 오늘 날짜를 input 의 min 값으로 사용 (과거 선택 막지는 않고 기본값 안내용)
+      const todayStr = useMemo(() => {
+        const t = new Date();
+        const y = t.getFullYear();
+        const m = String(t.getMonth() + 1).padStart(2, "0");
+        const d = String(t.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }, []);
+
+      // 빠른 선택 버튼: 오늘 기준 N일 뒤로 목표일 설정
+      const handleQuickSelect = (daysToAdd) => {
+        const base = todayMidnight();
+        // 오늘 자정에서 N일 뒤로 이동
+        base.setDate(base.getDate() + daysToAdd);
+        const y = base.getFullYear();
+        const m = String(base.getMonth() + 1).padStart(2, "0");
+        const d = String(base.getDate()).padStart(2, "0");
+        setTargetDate(`${y}-${m}-${d}`);
+        setError("");
+      };
+
+      // 날짜 입력 변경 핸들러
+      const handleDateChange = (e) => {
+        setTargetDate(e.target.value);
+        setError("");
+      };
+
+      // 초기화 버튼
+      const handleReset = () => {
+        setTitle("");
+        setTargetDate("");
+        setError("");
+      };
+
+      // (선택) 날짜 미입력 검증: 결과 영역에서 안내. 버튼 클릭형이 아니므로
+      // 입력이 비었을 때 안내 메시지를 보여주기 위한 함수.
+      const validate = () => {
+        if (!targetDate) {
+          setError("목표 날짜를 먼저 입력해 주세요.");
+          return false;
+        }
+        return true;
+      };
+
+      const hasResult = targetDate && countdown && ddayLabel;
+
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10">
+          <Card className="w-full max-w-md p-6 sm:p-8">
+            {/* 헤더 */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800">📅 D-day 계산기</h1>
+              <p className="mt-2 text-sm text-gray-400">목표 날짜까지 남은 시간을 실시간으로 확인하세요</p>
+            </div>
+
+            {/* 입력 영역 */}
+            <div className="space-y-4">
+              <Input
+                label="이벤트 이름 (선택)"
+                type="text"
+                placeholder="예: 수능까지, 여행까지"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <Input
+                label="목표 날짜"
+                type="date"
+                value={targetDate}
+                min={todayStr}
+                onChange={handleDateChange}
+                error={error}
+                onBlur={validate}
+              />
+
+              {/* 빠른 선택 버튼 */}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => handleQuickSelect(7)}>+7일</Button>
+                <Button variant="secondary" size="sm" onClick={() => handleQuickSelect(30)}>+30일</Button>
+                <Button variant="secondary" size="sm" onClick={() => handleQuickSelect(100)}>+100일</Button>
+                <Button variant="secondary" size="sm" onClick={() => handleQuickSelect(365)}>+1년</Button>
+              </div>
+            </div>
+
+            {/* 결과 영역 */}
+            <div className="mt-8">
+              {!hasResult ? (
+                // 빈 상태(목표 날짜 미입력) 안내
+                <div className="text-center py-10 text-gray-300">
+                  <p className="text-5xl mb-3">🗓️</p>
+                  <p className="text-sm">목표 날짜를 입력하면<br />D-day 가 여기에 표시됩니다.</p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  {/* 이벤트 이름 표시 */}
+                  {title && (
+                    <p className="text-base font-medium text-indigo-500 mb-1">{title}</p>
+                  )}
+
+                  {/* 큰 D-day 숫자 강조 */}
+                  <p
+                    className={`text-6xl sm:text-7xl font-black tracking-tight animate-pulse-soft ${
+                      countdown.isPast ? "text-gray-400" : "text-indigo-600"
+                    }`}
+                  >
+                    {ddayLabel}
+                  </p>
+
+                  {/* 안내 문구 */}
+                  <p className="mt-2 text-sm text-gray-400">
+                    {dayDiff > 0 && `목표일까지 ${dayDiff}일 남았어요`}
+                    {dayDiff === 0 && "오늘이 바로 그 날이에요! 🎉"}
+                    {dayDiff < 0 && `${Math.abs(dayDiff)}일 지났어요`}
+                  </p>
+
+                  {/* 실시간 카운트다운 (일/시/분/초) */}
+                  <div className="mt-6">
+                    <p className="text-xs text-gray-400 mb-2">
+                      {countdown.isPast ? "⏱️ 목표 시점으로부터 경과 시간" : "⏱️ 목표 자정까지 남은 시간"}
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      <CountBox value={countdown.days} label="일" />
+                      <CountBox value={countdown.hours} label="시간" />
+                      <CountBox value={countdown.minutes} label="분" />
+                      <CountBox value={countdown.seconds} label="초" />
+                    </div>
+                  </div>
+
+                  {/* 초기화 버튼 */}
+                  <div className="mt-6">
+                    <Button variant="ghost" size="sm" onClick={handleReset}>
+                      🔄 초기화
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* 현재 시각 표시 (실시간 업데이트가 동작 중임을 보여줌) */}
+          <p className="mt-6 text-xs text-gray-400">
+            현재 시각: {now.toLocaleTimeString("ko-KR")}
+          </p>
+        </div>
+      );
+    }
+
+    // ========================================
+    // 🚀 App 루트 컴포넌트
+    // ========================================
+    function App() {
+      return <DdayCalculator />;
+    }
+
+    // ========================================
+    // 렌더링
+    // ========================================
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
