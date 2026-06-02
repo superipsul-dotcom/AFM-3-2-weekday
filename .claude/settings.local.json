@@ -7,7 +7,9 @@
       "Read(//private/tmp/**)",
       "Bash(curl -s -A \"Mozilla/5.0\" \"https://cdn.jsdelivr.net/npm/lunar-javascript/lunar.js\" -o lunar.js)",
       "Bash(node -e ' *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(brew *)"
     ]
   }
 }
