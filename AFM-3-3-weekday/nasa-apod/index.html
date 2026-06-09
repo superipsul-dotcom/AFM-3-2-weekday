@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>오늘의 천문학 사진 · NASA APOD</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React 18 + ReactDOM + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Google Fonts: Playfair Display (serif headlines) + Noto Sans KR (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --space-bg: #05060f;
+      --space-bg-2: #0a0d1f;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--space-bg);
+      font-family: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+      color: #e8eaf2;
+    }
+
+    .font-serif-display { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* ===== Starfield background ===== */
+    .starfield {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at top, #11142e 0%, var(--space-bg) 55%, #02030a 100%);
+      overflow: hidden;
+    }
+    .stars, .stars2, .stars3 {
+      position: absolute;
+      inset: -200px;
+      background-repeat: repeat;
+    }
+    .stars {
+      background-image:
+        radial-gradient(1px 1px at 20px 30px, #ffffff, transparent),
+        radial-gradient(1px 1px at 130px 80px, #cbd5ff, transparent),
+        radial-gradient(1px 1px at 250px 160px, #ffffff, transparent),
+        radial-gradient(1.5px 1.5px at 90px 200px, #fff, transparent),
+        radial-gradient(1px 1px at 320px 40px, #e0e7ff, transparent);
+      background-size: 360px 360px;
+      animation: drift 240s linear infinite;
+      opacity: 0.7;
+    }
+    .stars2 {
+      background-image:
+        radial-gradient(1px 1px at 60px 120px, #ffffff, transparent),
+        radial-gradient(1.5px 1.5px at 200px 50px, #b9c6ff, transparent),
+        radial-gradient(1px 1px at 280px 220px, #fff, transparent),
+        radial-gradient(1px 1px at 150px 300px, #fff, transparent);
+      background-size: 420px 420px;
+      animation: drift 360s linear infinite;
+      opacity: 0.45;
+    }
+    .stars3 {
+      background-image:
+        radial-gradient(2px 2px at 110px 90px, #fff, transparent),
+        radial-gradient(1.5px 1.5px at 300px 260px, #d8e0ff, transparent);
+      background-size: 520px 520px;
+      animation: twinkle 6s ease-in-out infinite alternate, drift 480s linear infinite;
+      opacity: 0.6;
+    }
+    @keyframes drift {
+      from { transform: translateY(0); }
+      to   { transform: translateY(360px); }
+    }
+    @keyframes twinkle {
+      from { opacity: 0.25; }
+      to   { opacity: 0.75; }
+    }
+
+    /* ===== Drop cap ===== */
+    .dropcap::first-letter {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      float: left;
+      font-size: 4.4rem;
+      line-height: 0.82;
+      padding: 0.1rem 0.7rem 0 0;
+      color: #a9b6ff;
+      text-shadow: 0 0 24px rgba(120, 140, 255, 0.45);
+    }
+
+    /* ===== Fade / motion ===== */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .fade-in-slow { animation: fadeUp 1s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+    /* ===== Spinner ===== */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 46px; height: 46px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #8ea2ff;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    /* ===== Skeleton shimmer ===== */
+    @keyframes shimmer {
+      0% { background-position: -480px 0; }
+      100% { background-position: 480px 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #11142a 0%, #1c2142 45%, #11142a 90%);
+      background-size: 960px 100%;
+      animation: shimmer 1.6s linear infinite;
+    }
+
+    /* Custom scrollbar for the recent strip */
+    .scroll-thin::-webkit-scrollbar { height: 8px; }
+    .scroll-thin::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 99px; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: rgba(140,160,255,0.35); border-radius: 99px; }
+
+    /* Native date picker icon tint */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.8);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="starfield" aria-hidden="true">
+    <div class="stars"></div>
+    <div class="stars2"></div>
+    <div class="stars3"></div>
+  </div>
+
+  <div id="root" class="relative z-10"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+    // ============================================================
+    // CONFIG & CONSTANTS
+    // ============================================================
+    // 개인 발급 키 (시간당 1,000회 한도). 키 발급: https://api.nasa.gov
+    const NASA_KEY = "kdHTVMscX6ozec6Y9HDoMDeBRuiZtPSImvvQW8xy";
+
+    const API_BASE = "https://api.nasa.gov/planetary/apod";
+    const FIRST_APOD = "1995-06-16"; // 최초의 APOD 날짜
+    const RECENT_COUNT = 10;          // 최근 사진 개수
+
+    // ============================================================
+    // DATE HELPERS
+    // ============================================================
+    const pad = (n) => String(n).padStart(2, "0");
+
+    function todayISO() {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    // ISO 문자열에 일수를 더함 (UTC 기준으로 안전하게 처리)
+    function shiftISO(iso, days) {
+      const [y, m, d] = iso.split("-").map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      dt.setUTCDate(dt.getUTCDate() + days);
+      return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+    }
+
+    function compareISO(a, b) {
+      return a < b ? -1 : a > b ? 1 : 0;
+    }
+
+    const KO_MONTH = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+    function formatKorean(iso) {
+      if (!iso) return "";
+      const [y, m, d] = iso.split("-").map(Number);
+      return `${y}년 ${m}월 ${d}일`;
+    }
+    function weekdayKorean(iso) {
+      const [y, m, d] = iso.split("-").map(Number);
+      const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+      return ["일","월","화","수","목","금","토"][wd] + "요일";
+    }
+
+    // ============================================================
+    // DATA FETCHING
+    // ============================================================
+    function buildUrl(params) {
+      const usp = new URLSearchParams({ api_key: NASA_KEY, thumbs: "true", ...params });
+      return `${API_BASE}?${usp.toString()}`;
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      if (res.status === 429) {
+        const err = new Error("RATE_LIMIT");
+        err.code = 429;
+        throw err;
+      }
+      if (!res.ok) {
+        const err = new Error(`HTTP_${res.status}`);
+        err.code = res.status;
+        throw err;
+      }
+      return res.json();
+    }
+
+    // 비디오/이미지 모두에서 배경/썸네일로 쓸 수 있는 이미지 URL 선택
+    function pickImage(apod, { hd = false } = {}) {
+      if (!apod) return null;
+      if (apod.media_type === "video") {
+        return apod.thumbnail_url || null;
+      }
+      if (hd && apod.hdurl) return apod.hdurl;
+      return apod.url || apod.hdurl || null;
+    }
+
+    function googleTranslateUrl(text, tl = "ko") {
+      const u = new URLSearchParams({ sl: "en", tl, text: text || "" });
+      return `https://translate.google.com/?${u.toString()}&op=translate`;
+    }
+
+    // ============================================================
+    // 🌐 I18N — LANGUAGE CONFIG + UI STRINGS
+    // ============================================================
+    // 언어 옵션: code = 우리가 쓰는 식별자, gt = Google translate 대상 코드(null = 원문)
+    const LANGS = [
+      { code: "en", label: "EN",    gt: null     },
+      { code: "ko", label: "한국어", gt: "ko"     },
+      { code: "zh", label: "中文",   gt: "zh-CN"  },
+      { code: "ja", label: "日本語", gt: "ja"     },
+    ];
+    const DEFAULT_LANG = "ko"; // 사용자 요청: 한국어 우선
+    const LANG_STORAGE_KEY = "apod:lang";
+
+    function gtCodeFor(lang) {
+      const found = LANGS.find((l) => l.code === lang);
+      return found ? found.gt : null;
+    }
+
+    // 화면 UI 라벨 (실제 APOD 본문 번역과 별개의 정적 문구)
+    const STRINGS = {
+      en: {
+        eyebrow: "Astronomy Picture of the Day",
+        explanation: "Explanation",
+        viewHd: "↗ View Original (HD)",
+        prev: "‹ Prev Day",
+        next: "Next Day ›",
+        today: "★ Today",
+        recent: "Recent",
+        recentEn: "Recent",
+        loading: (d) => `Loading the picture for ${d}…`,
+        translating: "Translating…",
+        transFail: "Couldn't load the translation — showing the original (English).",
+        gtLink: "🌐 Open in Google Translate",
+        engOnly: "The original NASA text is in English.",
+        nowViewing: "Now viewing",
+        video: "▶ Video",
+        noPreview: "No preview",
+        labelDate: "Date", labelType: "Type", labelCopyright: "Copyright",
+        typePhoto: "Photo", typeVideo: "Video",
+        pickDate: "Pick a date",
+      },
+      ko: {
+        eyebrow: "오늘의 천문학 사진",
+        explanation: "Explanation",
+        viewHd: "↗ 원본(HD) 보기",
+        prev: "‹ 이전 날",
+        next: "다음 날 ›",
+        today: "★ 오늘",
+        recent: "최근 사진",
+        recentEn: "Recent",
+        loading: (d) => `${d}의 사진을 불러오는 중…`,
+        translating: "번역 중…",
+        transFail: "번역을 불러오지 못해 원문(영어)을 표시합니다.",
+        gtLink: "🌐 Google 번역으로 보기",
+        engOnly: "※ NASA 해설은 영어로만 제공됩니다.",
+        nowViewing: "지금 보는 중",
+        video: "▶ 영상",
+        noPreview: "미리보기 없음",
+        labelDate: "날짜", labelType: "유형", labelCopyright: "저작권",
+        typePhoto: "사진", typeVideo: "영상",
+        pickDate: "날짜 선택",
+      },
+      zh: {
+        eyebrow: "每日天文一图",
+        explanation: "解说",
+        viewHd: "↗ 查看原图 (HD)",
+        prev: "‹ 前一天",
+        next: "后一天 ›",
+        today: "★ 今天",
+        recent: "最近的图片",
+        recentEn: "Recent",
+        loading: (d) => `正在加载 ${d} 的图片…`,
+        translating: "翻译中…",
+        transFail: "无法加载翻译，显示原文（英文）。",
+        gtLink: "🌐 用 Google 翻译查看",
+        engOnly: "※ NASA 解说仅提供英文。",
+        nowViewing: "正在查看",
+        video: "▶ 视频",
+        noPreview: "无预览",
+        labelDate: "日期", labelType: "类型", labelCopyright: "版权",
+        typePhoto: "图片", typeVideo: "视频",
+        pickDate: "选择日期",
+      },
+      ja: {
+        eyebrow: "今日の天文写真",
+        explanation: "解説",
+        viewHd: "↗ オリジナル(HD)を見る",
+        prev: "‹ 前の日",
+        next: "次の日 ›",
+        today: "★ 今日",
+        recent: "最近の写真",
+        recentEn: "Recent",
+        loading: (d) => `${d} の写真を読み込み中…`,
+        translating: "翻訳中…",
+        transFail: "翻訳を読み込めなかったため、原文（英語）を表示します。",
+        gtLink: "🌐 Google 翻訳で見る",
+        engOnly: "※ NASAの解説は英語のみで提供されます。",
+        nowViewing: "表示中",
+        video: "▶ 動画",
+        noPreview: "プレビューなし",
+        labelDate: "日付", labelType: "種類", labelCopyright: "著作権",
+        typePhoto: "写真", typeVideo: "動画",
+        pickDate: "日付を選択",
+      },
+    };
+    function getStrings(lang) {
+      return STRINGS[lang] || STRINGS.en;
+    }
+
+    // ============================================================
+    // 🌐 TRANSLATION (free gtx endpoint) + CHUNKING + CACHE
+    // ============================================================
+    // 모듈 레벨 캐시: key = `${date}|${lang}`  → { title, explanation, failed }
+    const translationCache = new Map();
+
+    const GTX_BASE = "https://translate.googleapis.com/translate_a/single";
+    const CHUNK_LIMIT = 1500; // 이 길이를 넘으면 문장 단위로 분할
+
+    // 긴 텍스트를 ". " 경계로 분할해 각 조각이 CHUNK_LIMIT 이하가 되도록 함
+    function splitForTranslate(text) {
+      if (!text) return [""];
+      if (text.length <= CHUNK_LIMIT) return [text];
+      // 문장 끝(". ")을 보존하며 분할
+      const sentences = text.split(/(?<=\. )/);
+      const chunks = [];
+      let buf = "";
+      for (const s of sentences) {
+        if ((buf + s).length > CHUNK_LIMIT && buf) {
+          chunks.push(buf);
+          buf = s;
+        } else {
+          buf += s;
+        }
+        // 단일 문장이 한계를 넘는 극단적 경우: 강제로 잘라 넣음
+        while (buf.length > CHUNK_LIMIT) {
+          chunks.push(buf.slice(0, CHUNK_LIMIT));
+          buf = buf.slice(CHUNK_LIMIT);
+        }
+      }
+      if (buf) chunks.push(buf);
+      return chunks;
+    }
+
+    async function translateChunk(text, tl) {
+      const url =
+        `${GTX_BASE}?client=gtx&sl=en&tl=${encodeURIComponent(tl)}` +
+        `&dt=t&q=${encodeURIComponent(text)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`GTX_${res.status}`);
+      const data = await res.json();
+      // 응답 구조: data[0] = [[translatedChunk, originalChunk, ...], ...]
+      if (!data || !Array.isArray(data[0])) throw new Error("GTX_SHAPE");
+      return data[0].map((seg) => (seg && seg[0]) || "").join("");
+    }
+
+    async function translateText(text, tl) {
+      if (!text) return "";
+      const chunks = splitForTranslate(text);
+      const translated = await Promise.all(chunks.map((c) => translateChunk(c, tl)));
+      return translated.join("");
+    }
+
+    // title + explanation을 선택 언어로 번역. 실패 시 throw (호출부에서 fallback)
+    async function translateApod(apod, lang) {
+      const tl = gtCodeFor(lang);
+      const key = `${apod.date}|${lang}`;
+      if (lang === "en" || !tl) {
+        // 원문 그대로 (캐시 불필요)
+        return { title: apod.title, explanation: apod.explanation, failed: false };
+      }
+      if (translationCache.has(key)) return translationCache.get(key);
+
+      const [title, explanation] = await Promise.all([
+        translateText(apod.title, tl),
+        translateText(apod.explanation, tl),
+      ]);
+      const result = { title, explanation, failed: false };
+      translationCache.set(key, result);
+      return result;
+    }
+
+    // ============================================================
+    // 🎨 DESIGN SYSTEM COMPONENTS
+    // ============================================================
+    function Button({ children, variant = "primary", size = "md", disabled, onClick, className = "", as = "button", href, ...rest }) {
+      const base =
+        "inline-flex items-center justify-center gap-2 font-medium rounded-full transition-all duration-200 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 disabled:opacity-35 disabled:cursor-not-allowed";
+      const variants = {
+        primary: "bg-indigo-500/90 hover:bg-indigo-400 text-white shadow-lg shadow-indigo-900/40",
+        secondary: "bg-white/8 hover:bg-white/15 text-slate-100 border border-white/12 backdrop-blur",
+        ghost: "bg-transparent hover:bg-white/8 text-slate-300 hover:text-white",
+        outline: "border border-indigo-400/50 text-indigo-200 hover:bg-indigo-500/15",
+      };
+      const sizes = {
+        sm: "text-xs px-3 py-1.5",
+        md: "text-sm px-4 py-2",
+        lg: "text-base px-6 py-3",
+      };
+      const cls = `${base} ${variants[variant]} ${sizes[size]} ${className}`;
+      if (as === "a") {
+        return (
+          <a href={href} className={cls} target="_blank" rel="noopener noreferrer" {...rest}>
+            {children}
+          </a>
+        );
+      }
+      return (
+        <button className={cls} disabled={disabled} onClick={onClick} {...rest}>
+          {children}
+        </button>
+      );
+    }
+
+    function Badge({ children, className = "" }) {
+      return (
+        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide uppercase px-2.5 py-1 rounded-full ${className}`}>
+          {children}
+        </span>
+      );
+    }
+
+    function SectionLabel({ ko, en }) {
+      return (
+        <div className="flex items-center gap-4 mb-8">
+          <span className="h-px flex-1 bg-gradient-to-r from-transparent via-indigo-300/30 to-indigo-300/30" />
+          <span className="text-indigo-200/90 tracking-[0.25em] text-xs sm:text-sm uppercase whitespace-nowrap">
+            <span className="font-semibold">{ko}</span>
+            <span className="text-indigo-300/50 mx-2">/</span>
+            <span className="font-serif-display italic">{en}</span>
+          </span>
+          <span className="h-px flex-1 bg-gradient-to-l from-transparent via-indigo-300/30 to-indigo-300/30" />
+        </div>
+      );
+    }
+
+    function Spinner({ label }) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 py-24">
+          <div className="spinner" />
+          {label && <p className="text-slate-400 text-sm tracking-wide">{label}</p>}
+        </div>
+      );
+    }
+
+    // 🌐 LANGUAGE SWITCHER — segmented pill group
+    function LanguageSwitcher({ lang, onChange, busy = false, size = "md", className = "" }) {
+      const pad = size === "sm" ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs sm:text-sm";
+      return (
+        <div
+          role="group"
+          aria-label="언어 선택 / Language"
+          className={`inline-flex items-center gap-0.5 rounded-full bg-white/8 border border-white/12 backdrop-blur p-0.5 ${className}`}
+        >
+          {LANGS.map((l) => {
+            const active = l.code === lang;
+            return (
+              <button
+                key={l.code}
+                onClick={() => onChange(l.code)}
+                aria-pressed={active}
+                title={l.label}
+                className={`relative rounded-full font-medium transition-all duration-200 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 ${pad} ${
+                  active
+                    ? "bg-indigo-500/90 text-white shadow shadow-indigo-900/40"
+                    : "text-slate-300 hover:text-white hover:bg-white/8"
+                }`}
+              >
+                {l.label}
+                {active && busy && (
+                  <span className="ml-1.5 inline-block w-2.5 h-2.5 align-middle rounded-full border border-white/40 border-t-white animate-spin" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ============================================================
+    // 🧩 LOADING SKELETON (hero)
+    // ============================================================
+    function HeroSkeleton() {
+      return (
+        <div className="relative w-full h-[78vh] min-h-[520px] overflow-hidden rounded-b-3xl">
+          <div className="skeleton absolute inset-0" />
+          <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-12 space-y-4">
+            <div className="skeleton h-4 w-40 rounded-full" />
+            <div className="skeleton h-12 w-3/4 rounded-lg" />
+            <div className="skeleton h-12 w-1/2 rounded-lg" />
+            <div className="skeleton h-4 w-56 rounded-full" />
+          </div>
+        </div>
+      );
+    }
+
+    // ============================================================
+    // 🧩 ERROR STATE
+    // ============================================================
+    function ErrorState({ error, onRetry }) {
+      const isRate = error && error.code === 429;
+      const msg = isRate
+        ? "요청이 많아 잠시 후 다시 시도해 주세요 (DEMO_KEY 사용량 초과)"
+        : "사진을 불러오지 못했습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.";
+      return (
+        <div className="flex flex-col items-center justify-center text-center gap-5 py-24 px-6 fade-in">
+          <div className="text-5xl">{isRate ? "🛰️" : "📡"}</div>
+          <h3 className="font-serif-display text-2xl text-slate-100">잠시 신호가 끊겼어요</h3>
+          <p className="text-slate-400 max-w-md leading-relaxed">{msg}</p>
+          {isRate && (
+            <p className="text-xs text-slate-500 max-w-md">
+              개인 API 키를 사용하면 한도가 늘어납니다 —{" "}
+              <a href="https://api.nasa.gov" target="_blank" rel="noopener noreferrer" className="text-indigo-300 underline underline-offset-2">api.nasa.gov</a>
+              에서 무료 발급 후 코드의 <code className="text-indigo-200">NASA_KEY</code> 값을 교체하세요.
+            </p>
+          )}
+          <Button onClick={onRetry} variant="primary" size="lg">
+            ↻ 다시 시도
+          </Button>
+        </div>
+      );
+    }
+
+    // ============================================================
+    // 🧩 HERO / COVER
+    // ============================================================
+    function Hero({ apod, lang, title }) {
+      const t = getStrings(lang);
+      const isVideo = apod.media_type === "video";
+      const bg = pickImage(apod);
+      const hdLink = apod.hdurl || apod.url;
+      const displayTitle = title || apod.title;
+
+      return (
+        <header className="relative w-full min-h-[80vh] sm:min-h-[88vh] flex flex-col justify-end overflow-hidden rounded-b-[2rem] fade-in">
+          {/* Background image */}
+          {bg ? (
+            <img
+              src={bg}
+              alt={apod.title}
+              className="absolute inset-0 w-full h-full object-cover scale-105"
+              loading="eager"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 to-black" />
+          )}
+
+          {/* Gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#05060f] via-[#05060f]/55 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-transparent to-transparent" />
+
+          {/* Top masthead */}
+          <div className="absolute top-0 left-0 right-0 p-6 sm:p-10 flex items-center justify-between z-10">
+            <div className="flex items-center gap-3">
+              <span className="text-indigo-200 text-xs sm:text-sm tracking-[0.35em] uppercase font-light">NASA</span>
+              <span className="h-4 w-px bg-white/30" />
+              <span className="text-slate-200 text-xs sm:text-sm tracking-[0.2em] uppercase">Astronomy Picture of the Day</span>
+            </div>
+            <Badge className="bg-white/10 text-slate-200 border border-white/15 backdrop-blur hidden sm:inline-flex">
+              {isVideo ? "▶ Video Feature" : "Photo Feature"}
+            </Badge>
+          </div>
+
+          {/* Headline block */}
+          <div className="relative z-10 p-6 sm:p-12 max-w-5xl">
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <span className="text-indigo-200/90 tracking-[0.25em] text-xs uppercase">
+                {t.eyebrow}
+              </span>
+              <span className="h-3 w-px bg-indigo-300/40" />
+              <time className="text-slate-300 text-sm">
+                {formatKorean(apod.date)} · {weekdayKorean(apod.date)}
+              </time>
+            </div>
+
+            <h1 className="font-serif-display font-black text-white leading-[1.04] text-4xl sm:text-6xl lg:text-7xl drop-shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
+              {displayTitle}
+            </h1>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              {hdLink && (
+                <Button as="a" href={hdLink} variant="secondary" size="md">
+                  {t.viewHd}
+                </Button>
+              )}
+              {apod.copyright && (
+                <span className="text-slate-300/90 text-sm italic">
+                  © {apod.copyright.trim()}
+                </span>
+              )}
+              {!apod.copyright && (
+                <span className="text-slate-400/70 text-sm italic">
+                  Public domain · NASA
+                </span>
+              )}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // ============================================================
+    // 🧩 MEDIA FRAME (in-article — large image or responsive video)
+    // ============================================================
+    function MediaFrame({ apod }) {
+      const isVideo = apod.media_type === "video";
+
+      if (isVideo) {
+        return (
+          <figure className="fade-in">
+            <div className="relative w-full rounded-xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/10" style={{ paddingTop: "56.25%" }}>
+              <iframe
+                src={apod.url}
+                title={apod.title}
+                className="absolute inset-0 w-full h-full"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+            <figcaption className="mt-3 text-center text-xs text-slate-500">
+              ▶ 영상 · {apod.title}
+            </figcaption>
+          </figure>
+        );
+      }
+
+      const src = apod.url || apod.hdurl;
+      if (!src) {
+        return (
+          <div className="rounded-xl border border-white/10 bg-white/5 py-16 text-center text-slate-400 fade-in">
+            이미지를 표시할 수 없습니다.
+          </div>
+        );
+      }
+      return (
+        <figure className="fade-in">
+          <a href={apod.hdurl || apod.url} target="_blank" rel="noopener noreferrer" className="block group">
+            <div className="relative rounded-xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/10">
+              <img
+                src={src}
+                alt={apod.title}
+                className="w-full h-auto transition-transform duration-700 group-hover:scale-[1.02]"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 ring-1 ring-inset ring-white/5 pointer-events-none" />
+            </div>
+          </a>
+          <figcaption className="mt-3 flex items-center justify-between text-xs text-slate-500">
+            <span>{apod.title}</span>
+            {apod.hdurl ? (
+              <a href={apod.hdurl} target="_blank" rel="noopener noreferrer" className="text-indigo-300 hover:text-indigo-200 underline underline-offset-2">
+                HD 원본 ↗
+              </a>
+            ) : (
+              <span className="italic text-slate-600">HD 원본 없음</span>
+            )}
+          </figcaption>
+        </figure>
+      );
+    }
+
+    // ============================================================
+    // 🧩 ARTICLE BODY
+    // ============================================================
+    function Article({ apod, lang, onLangChange, translation, translating, transFailed }) {
+      const t = getStrings(lang);
+      const isEnglish = lang === "en";
+      // 표시할 본문: 번역 결과가 있으면 그것을, 없으면(로딩 중/실패) 원문
+      const explanationText =
+        translation && translation.explanation ? translation.explanation : apod.explanation;
+      // 번역 중에는 드롭캡 플래시를 끄고 본문을 살짝 흐리게 (이전 텍스트 유지)
+      const showDropcap = !translating;
+
+      return (
+        <article className="relative z-10 px-5 sm:px-8 max-w-3xl mx-auto pt-14 sm:pt-20 fade-in-slow">
+          <MediaFrame apod={apod} key={apod.date} />
+
+          <div className="mt-16">
+            {/* Section label + inline language switcher */}
+            <div className="flex flex-col gap-4 mb-8 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <span className="hidden sm:block h-px flex-1 bg-gradient-to-r from-transparent via-indigo-300/30 to-indigo-300/30" />
+                <span className="text-indigo-200/90 tracking-[0.25em] text-xs sm:text-sm uppercase whitespace-nowrap">
+                  <span className="font-semibold">{t.explanation === "Explanation" ? "오늘의 해설" : t.explanation}</span>
+                  <span className="text-indigo-300/50 mx-2">/</span>
+                  <span className="font-serif-display italic">Explanation</span>
+                </span>
+              </div>
+              <LanguageSwitcher lang={lang} onChange={onLangChange} busy={translating} size="sm" />
+            </div>
+
+            {/* 번역 실패 안내 (원문으로 폴백) */}
+            {transFailed && !isEnglish && (
+              <div className="mb-5 flex items-start gap-2 rounded-lg border border-amber-300/25 bg-amber-400/8 px-4 py-2.5 text-xs text-amber-200/90 fade-in">
+                <span aria-hidden="true">⚠️</span>
+                <span>{t.transFail}</span>
+              </div>
+            )}
+
+            {/* 본문 — 번역 중에는 흐리게 + "번역 중" 인디케이터 오버레이 */}
+            <div className="relative">
+              <p
+                className={`${showDropcap ? "dropcap" : ""} text-slate-200/95 text-[1.06rem] sm:text-[1.18rem] leading-[1.95] tracking-[0.005em] [text-wrap:pretty] transition-opacity duration-300 ${
+                  translating ? "opacity-40 blur-[0.5px]" : "opacity-100"
+                }`}
+                aria-busy={translating}
+              >
+                {explanationText}
+              </p>
+
+              {translating && (
+                <div className="absolute inset-0 flex items-start justify-center pt-10 pointer-events-none">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-[#0a0d1f]/85 border border-white/12 backdrop-blur px-4 py-2 text-sm text-indigo-100 shadow-lg shadow-black/40">
+                    <span className="inline-block w-4 h-4 rounded-full border-2 border-indigo-300/40 border-t-indigo-200 animate-spin" />
+                    {t.translating}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-white/8 pt-6">
+              <span className="text-xs text-slate-500">
+                {t.engOnly}
+              </span>
+              <Button
+                as="a"
+                href={googleTranslateUrl(apod.explanation, gtCodeFor(lang) || "ko")}
+                variant="outline"
+                size="sm"
+              >
+                {t.gtLink}
+              </Button>
+            </div>
+
+            {/* Meta footer */}
+            <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm border-t border-white/8 pt-6">
+              <div>
+                <div className="text-slate-500 text-xs uppercase tracking-wider mb-1">{t.labelDate}</div>
+                <div className="text-slate-200">{formatKorean(apod.date)}</div>
+              </div>
+              <div>
+                <div className="text-slate-500 text-xs uppercase tracking-wider mb-1">{t.labelType}</div>
+                <div className="text-slate-200">{apod.media_type === "video" ? t.typeVideo : t.typePhoto}</div>
+              </div>
+              <div>
+                <div className="text-slate-500 text-xs uppercase tracking-wider mb-1">{t.labelCopyright}</div>
+                <div className="text-slate-200 truncate">{apod.copyright ? `© ${apod.copyright.trim()}` : "Public domain"}</div>
+              </div>
+            </div>
+          </div>
+        </article>
+      );
+    }
+
+    // ============================================================
+    // 🧩 DATE NAVIGATOR
+    // ============================================================
+    function DateNavigator({ date, maxDate, onChange, onPrev, onNext, onToday, lang, onLangChange, translating }) {
+      const t = getStrings(lang);
+      const isToday = date === maxDate;
+      const isFirst = compareISO(date, FIRST_APOD) <= 0;
+
+      return (
+        <nav className="sticky top-0 z-30 backdrop-blur-xl bg-[#05060f]/75 border-b border-white/8">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            <Button onClick={onPrev} disabled={isFirst} variant="ghost" size="sm" aria-label={t.prev}>
+              {t.prev}
+            </Button>
+
+            <input
+              type="date"
+              value={date}
+              min={FIRST_APOD}
+              max={maxDate}
+              onChange={(e) => e.target.value && onChange(e.target.value)}
+              className="bg-white/8 border border-white/12 rounded-full px-4 py-1.5 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+              aria-label={t.pickDate}
+            />
+
+            <Button onClick={onNext} disabled={isToday} variant="ghost" size="sm" aria-label={t.next}>
+              {t.next}
+            </Button>
+
+            <span className="h-5 w-px bg-white/12 mx-1 hidden sm:inline-block" />
+
+            <Button onClick={onToday} disabled={isToday} variant="outline" size="sm">
+              {t.today}
+            </Button>
+
+            <span className="h-5 w-px bg-white/12 mx-1 hidden md:inline-block" />
+
+            {/* Language switcher — primary placement in sticky nav */}
+            <LanguageSwitcher lang={lang} onChange={onLangChange} busy={translating} size="sm" />
+          </div>
+        </nav>
+      );
+    }
+
+    // ============================================================
+    // 🧩 RECENT GALLERY STRIP
+    // ============================================================
+    function GalleryItem({ item, active, onSelect, lang }) {
+      const t = getStrings(lang);
+      const thumb = pickImage(item);
+      const isVideo = item.media_type === "video";
+      return (
+        <button
+          onClick={() => onSelect(item.date)}
+          className={`group relative flex-shrink-0 w-44 sm:w-52 text-left rounded-xl overflow-hidden ring-1 transition-all duration-300 ${
+            active ? "ring-indigo-400 scale-[0.98]" : "ring-white/10 hover:ring-indigo-300/60"
+          }`}
+          aria-label={`${formatKorean(item.date)} ${item.title}`}
+        >
+          <div className="relative h-28 sm:h-32 bg-[#11142a]">
+            {thumb ? (
+              <img
+                src={thumb}
+                alt={item.title}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">{t.noPreview}</div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+            {isVideo && (
+              <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur">{t.video}</span>
+            )}
+            {active && (
+              <span className="absolute top-2 right-2 bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{t.nowViewing}</span>
+            )}
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-2.5">
+            <div className="text-[10px] text-indigo-200/90 mb-0.5">{formatKorean(item.date)}</div>
+            <div className="text-xs text-slate-100 font-medium leading-snug line-clamp-2">{item.title}</div>
+          </div>
+        </button>
+      );
+    }
+
+    function RecentGallery({ items, loading, activeDate, onSelect, lang }) {
+      const t = getStrings(lang);
+      return (
+        <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-24 pb-20">
+          <SectionLabel ko={t.recent} en="Recent" />
+
+          {loading ? (
+            <div className="flex gap-4 overflow-hidden">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="skeleton flex-shrink-0 w-44 sm:w-52 h-28 sm:h-32 rounded-xl" />
+              ))}
+            </div>
+          ) : items && items.length ? (
+            <div className="flex gap-4 overflow-x-auto scroll-thin pb-4 -mx-1 px-1 snap-x">
+              {items.map((it) => (
+                <div key={it.date} className="snap-start">
+                  <GalleryItem item={it} active={it.date === activeDate} onSelect={onSelect} lang={lang} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-slate-500 py-10">최근 사진을 불러오지 못했습니다.</p>
+          )}
+        </section>
+      );
+    }
+
+    // ============================================================
+    // 🧩 FOOTER
+    // ============================================================
+    function Footer() {
+      return (
+        <footer className="relative z-10 border-t border-white/8 py-12 px-6 text-center">
+          <p className="font-serif-display italic text-slate-400 text-lg mb-2">
+            “우리는 별의 먼지로 만들어졌다.”
+          </p>
+          <p className="text-xs text-slate-600 max-w-xl mx-auto leading-relaxed">
+            데이터 제공 ·{" "}
+            <a href="https://apod.nasa.gov" target="_blank" rel="noopener noreferrer" className="text-indigo-300/80 hover:text-indigo-200 underline underline-offset-2">NASA Astronomy Picture of the Day</a>
+            {" "}· DEMO_KEY는 사용량이 제한됩니다. 개인 키는{" "}
+            <a href="https://api.nasa.gov" target="_blank" rel="noopener noreferrer" className="text-indigo-300/80 hover:text-indigo-200 underline underline-offset-2">api.nasa.gov</a>
+            에서 무료로 발급받을 수 있습니다.
+          </p>
+        </footer>
+      );
+    }
+
+    // ============================================================
+    // 🚀 APP
+    // ============================================================
+    function App() {
+      const TODAY = useMemo(() => todayISO(), []);
+      const [date, setDate] = useState(TODAY);
+      const [apod, setApod] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+
+      const [recent, setRecent] = useState([]);
+      const [recentLoading, setRecentLoading] = useState(true);
+
+      // ----- Language state (persisted) -----
+      const [lang, setLang] = useState(() => {
+        try {
+          const saved = localStorage.getItem(LANG_STORAGE_KEY);
+          if (saved && LANGS.some((l) => l.code === saved)) return saved;
+        } catch (e) { /* localStorage 접근 불가 시 무시 */ }
+        return DEFAULT_LANG;
+      });
+      const [translation, setTranslation] = useState(null); // { title, explanation } | null
+      const [translating, setTranslating] = useState(false);
+      const [transFailed, setTransFailed] = useState(false);
+
+      const changeLang = useCallback((next) => {
+        setLang(next);
+        try { localStorage.setItem(LANG_STORAGE_KEY, next); } catch (e) { /* 무시 */ }
+      }, []);
+
+      const t = getStrings(lang);
+      const topRef = useRef(null);
+
+      // ----- Fetch single day -----
+      const loadDay = useCallback((targetDate) => {
+        let cancelled = false;
+        setLoading(true);
+        setError(null);
+        const params = targetDate === TODAY ? {} : { date: targetDate };
+        fetchJson(buildUrl(params))
+          .then((data) => {
+            if (cancelled) return;
+            setApod(data);
+            setLoading(false);
+          })
+          .catch((err) => {
+            if (cancelled) return;
+            setError(err);
+            setLoading(false);
+          });
+        return () => { cancelled = true; };
+      }, [TODAY]);
+
+      useEffect(() => {
+        const cleanup = loadDay(date);
+        return cleanup;
+      }, [date, loadDay]);
+
+      // ----- Fetch recent range (once) -----
+      const loadRecent = useCallback(() => {
+        setRecentLoading(true);
+        const end = TODAY;
+        const start = shiftISO(TODAY, -(RECENT_COUNT - 1));
+        fetchJson(buildUrl({ start_date: start, end_date: end }))
+          .then((data) => {
+            const arr = Array.isArray(data) ? data : [data];
+            // 최신순 정렬
+            arr.sort((a, b) => compareISO(b.date, a.date));
+            setRecent(arr);
+            setRecentLoading(false);
+          })
+          .catch(() => {
+            setRecent([]);
+            setRecentLoading(false);
+          });
+      }, [TODAY]);
+
+      useEffect(() => { loadRecent(); }, [loadRecent]);
+
+      // ----- Translate current APOD whenever apod or lang changes -----
+      useEffect(() => {
+        if (!apod) {
+          setTranslation(null);
+          setTranslating(false);
+          setTransFailed(false);
+          return;
+        }
+        // 영어(원문)는 번역 불필요
+        if (lang === "en" || !gtCodeFor(lang)) {
+          setTranslation({ title: apod.title, explanation: apod.explanation });
+          setTranslating(false);
+          setTransFailed(false);
+          return;
+        }
+
+        const key = `${apod.date}|${lang}`;
+        // 캐시에 있으면 즉시 적용 (스피너 없이)
+        if (translationCache.has(key)) {
+          setTranslation(translationCache.get(key));
+          setTranslating(false);
+          setTransFailed(false);
+          return;
+        }
+
+        let cancelled = false;
+        setTranslating(true);
+        setTransFailed(false);
+        translateApod(apod, lang)
+          .then((result) => {
+            if (cancelled) return;
+            setTranslation(result);
+            setTransFailed(false);
+          })
+          .catch(() => {
+            if (cancelled) return;
+            // 실패 시 원문으로 폴백 + 안내 노출
+            setTranslation({ title: apod.title, explanation: apod.explanation });
+            setTransFailed(true);
+          })
+          .finally(() => {
+            if (!cancelled) setTranslating(false);
+          });
+
+        return () => { cancelled = true; };
+      }, [apod, lang]);
+
+      // ----- Navigation handlers -----
+      const goTo = useCallback((d) => {
+        if (compareISO(d, FIRST_APOD) < 0) d = FIRST_APOD;
+        if (compareISO(d, TODAY) > 0) d = TODAY;
+        setDate(d);
+        if (topRef.current) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }, [TODAY]);
+
+      const handlePrev = useCallback(() => goTo(shiftISO(date, -1)), [date, goTo]);
+      const handleNext = useCallback(() => goTo(shiftISO(date, 1)), [date, goTo]);
+      const handleToday = useCallback(() => goTo(TODAY), [TODAY, goTo]);
+
+      return (
+        <div ref={topRef}>
+          <DateNavigator
+            date={date}
+            maxDate={TODAY}
+            onChange={goTo}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            onToday={handleToday}
+            lang={lang}
+            onLangChange={changeLang}
+            translating={translating}
+          />
+
+          {loading ? (
+            <>
+              <HeroSkeleton />
+              <Spinner label={t.loading(formatKorean(date))} />
+            </>
+          ) : error ? (
+            <ErrorState error={error} onRetry={() => loadDay(date)} />
+          ) : apod ? (
+            <main key={apod.date}>
+              <Hero apod={apod} lang={lang} title={translation ? translation.title : null} />
+              <Article
+                apod={apod}
+                lang={lang}
+                onLangChange={changeLang}
+                translation={translation}
+                translating={translating}
+                transFailed={transFailed}
+              />
+            </main>
+          ) : null}
+
+          <RecentGallery
+            items={recent}
+            loading={recentLoading}
+            activeDate={apod ? apod.date : date}
+            onSelect={goTo}
+            lang={lang}
+          />
+
+          <Footer />
+        </div>
+      );
+    }
+
+    // ============================================================
+    // RENDER
+    // ============================================================
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

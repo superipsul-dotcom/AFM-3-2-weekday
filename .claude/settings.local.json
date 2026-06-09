@@ -9,7 +9,19 @@
       "Bash(node -e ' *)",
       "Bash(git *)",
       "Bash(gh *)",
-      "Bash(brew *)"
+      "Bash(brew *)",
+      "Bash(open \"/Users/pyounghwahong/AFM-3-2-weekday/calculation/세금 계산기/index.html\")",
+      "Bash(mkdir -p /Users/pyounghwahong/AFM-3-3-weekday)",
+      "Read(//Users/pyounghwahong/**)",
+      "Bash(rmdir /Users/pyounghwahong/AFM-3-3-weekday)",
+      "Bash(mkdir -p /Users/pyounghwahong/AFM-3-2-weekday/AFM-3-3-weekday)",
+      "Bash(open *)",
+      "Bash(curl -s \"https://api.openweathermap.org/data/2.5/weather?lat=37.5665&lon=126.9780&appid=222b1df4207e76db3dacc7d3ee6b9c90&units=metric&lang=kr\")",
+      "Bash(curl -s \"https://api.openweathermap.org/data/2.5/weather?q=Seoul&appid=222b1df4207e76db3dacc7d3ee6b9c90&units=metric&lang=kr\")",
+      "Bash(curl -s \"https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&thumbs=true\")",
+      "Bash(curl -s \"https://api.nasa.gov/planetary/apod?api_key=kdHTVMscX6ozec6Y9HDoMDeBRuiZtPSImvvQW8xy&thumbs=true\")",
+      "Bash(curl -s --max-time 20 \"https://api.nasa.gov/planetary/apod?api_key=kdHTVMscX6ozec6Y9HDoMDeBRuiZtPSImvvQW8xy&thumbs=true\")",
+      "Bash(curl -s --max-time 25 \"https://api.nasa.gov/planetary/apod?api_key=kdHTVMscX6ozec6Y9HDoMDeBRuiZtPSImvvQW8xy\" -w \"\\\\nHTTP %{http_code}\\\\n\")"
     ]
   }
 }
