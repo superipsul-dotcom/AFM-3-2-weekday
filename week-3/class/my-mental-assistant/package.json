@@ -1,0 +1,12 @@
+{
+  "name": "my-mental-assistant",
+  "version": "1.0.0",
+  "description": "마음이 - 심리 상담 챗봇 (OpenAI 연동)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2"
+  }
+}

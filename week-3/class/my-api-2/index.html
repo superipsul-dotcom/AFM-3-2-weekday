@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오늘의 인사 ✨</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .animate-float { animation: float 3s ease-in-out infinite; }
+    @keyframes pop {
+      0% { opacity: 0; transform: scale(0.92) translateY(8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-pop { animation: pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ========================================
+    // React Hooks
+    // ========================================
+    const { useState, useCallback } = React;
+
+    // API base:
+    // - 서버(http://localhost:3000)가 이 페이지를 서빙하면 같은 출처 상대경로 '/api' 사용
+    // - index.html을 파일(file://)로 직접 열었거나 다른 포트면 localhost:3000 으로 직접 호출
+    //   (server.js 에 CORS 가 켜져 있어 직접 호출도 동작함)
+    const API_BASE_URL =
+      window.location.protocol === 'http:' || window.location.protocol === 'https:'
+        ? '/api'
+        : 'http://localhost:3000/api';
+
+    // ========================================
+    // 🎨 Design System Components
+    // ========================================
+    function Button({ children, onClick, disabled = false, className = '' }) {
+      return (
+        <button
+          onClick={onClick}
+          disabled={disabled}
+          className={
+            `inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl ` +
+            `text-lg font-bold text-white shadow-lg transition-all duration-200 ` +
+            `bg-gradient-to-r from-violet-500 to-fuchsia-500 ` +
+            `hover:from-violet-600 hover:to-fuchsia-600 hover:shadow-xl hover:-translate-y-0.5 ` +
+            `active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-violet-300 ` +
+            `disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 ` +
+            className
+          }
+        >
+          {children}
+        </button>
+      );
+    }
+
+    function Spinner() {
+      return (
+        <svg
+          className="animate-spin h-6 w-6 text-violet-500"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      );
+    }
+
+    // ========================================
+    // 📄 Page Component
+    // ========================================
+    function GreetingCard() {
+      const [data, setData] = useState(null);     // { greeting, time }
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+
+      const fetchHello = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const res = await fetch(`${API_BASE_URL}/hello`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          setData(json);
+        } catch (e) {
+          setError('서버에 연결할 수 없어요. server.js가 실행 중인지 확인하세요.');
+          setData(null);
+        } finally {
+          setLoading(false);
+        }
+      }, []);
+
+      return (
+        <div className="w-full max-w-md">
+          <div className="bg-white/90 backdrop-blur rounded-3xl shadow-2xl p-8 sm:p-10 text-center">
+            {/* 헤더 */}
+            <div className="text-6xl mb-3 animate-float" aria-hidden="true">👋</div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800">오늘의 인사</h1>
+            <p className="mt-2 text-sm text-gray-500">버튼을 누르면 서버가 인사와 시간을 알려줘요.</p>
+
+            {/* 결과 영역 */}
+            <div className="mt-8 min-h-[140px] flex items-center justify-center">
+              {loading ? (
+                <div className="flex flex-col items-center gap-3 text-gray-500">
+                  <Spinner />
+                  <span className="text-sm">인사를 가져오는 중...</span>
+                </div>
+              ) : error ? (
+                <div className="animate-pop w-full rounded-2xl bg-rose-50 border border-rose-200 px-5 py-6">
+                  <div className="text-3xl mb-2" aria-hidden="true">😢</div>
+                  <p className="text-rose-600 font-medium text-sm leading-relaxed">{error}</p>
+                </div>
+              ) : data ? (
+                <div className="animate-pop w-full">
+                  <p className="text-2xl sm:text-3xl font-bold text-violet-600 leading-snug break-keep">
+                    {data.greeting}
+                  </p>
+                  <p className="mt-4 inline-flex items-center gap-2 text-sm text-gray-500 bg-gray-100 rounded-full px-4 py-1.5">
+                    <span aria-hidden="true">🕒</span>
+                    <span>{data.time}</span>
+                  </p>
+                </div>
+              ) : (
+                <div className="text-gray-400">
+                  <div className="text-4xl mb-2" aria-hidden="true">✨</div>
+                  <p className="text-sm">아직 인사를 받지 않았어요.</p>
+                </div>
+              )}
+            </div>
+
+            {/* 버튼 */}
+            <div className="mt-8">
+              <Button onClick={fetchHello} disabled={loading} className="w-full">
+                {loading ? '가져오는 중...' : '지금 시간 + 인사 받기'}
+              </Button>
+            </div>
+          </div>
+
+          <p className="mt-5 text-center text-xs text-white/80">
+            GET <span className="font-mono">/api/hello</span> · 같은 출처에서 호출
+          </p>
+        </div>
+      );
+    }
+
+    // ========================================
+    // 🚀 App
+    // ========================================
+    function App() {
+      return (
+        <div className="min-h-screen w-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400">
+          <GreetingCard />
+        </div>
+      );
+    }
+
+    // ========================================
+    // Rendering
+    // ========================================
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
